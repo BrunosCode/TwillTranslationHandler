@@ -105,10 +105,16 @@ class TranslationGroupRepository extends ModuleRepository
 
         $group = TranslationGroup::findOrFail($id);
 
-        TranslationHandler::setOption('fileNames', [$group->getFileName()])
-            ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
-
-        TranslationHandler::resetOptions();
+        try {
+            TranslationHandler::setOption('fileNames', [$group->getFileName()])
+                ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
+        } catch (\Throwable $e) {
+            // The values are saved: a failed export must not lose them, but it
+            // leaves the lang files stale, so it has to reach the logs.
+            report($e);
+        } finally {
+            TranslationHandler::resetOptions();
+        }
 
         return $result;
     }

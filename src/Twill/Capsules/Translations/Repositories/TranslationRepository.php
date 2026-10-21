@@ -59,9 +59,11 @@ class TranslationRepository extends ModuleRepository
 
             TranslationHandler::setOption('fileNames', [$prefix])
                 ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
-
-            TranslationHandler::resetOptions();
         } catch (\Throwable $e) {
+            // The value is saved: a failed export must not lose it, but it
+            // leaves the lang files stale, so it has to reach the logs.
+            report($e);
+        } finally {
             TranslationHandler::resetOptions();
         }
 

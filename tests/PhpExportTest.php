@@ -1,8 +1,11 @@
 <?php
 
+use BrunosCode\TranslationHandler\Facades\TranslationHandler;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationGroupRepository;
+use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationRepository;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
 
 function makeTranslation(string $key, array $values): Translation
@@ -57,4 +60,38 @@ it('exports a nested group into the top-level php file', function () {
             'failed' => 'Failed',
             'messages' => ['hello' => 'Hi'],
         ]);
+});
+
+it('reports a failed php export after saving a key', function () {
+    Exceptions::fake();
+
+    $translation = makeTranslation('auth.a', ['en' => 'A', 'it' => 'A']);
+    makeTranslation('auth.a.b', ['en' => 'B', 'it' => 'B']);
+
+    app(TranslationRepository::class)->update($translation->id, [
+        'key' => 'auth.a',
+        'published' => true,
+        'value' => ['en' => 'A2', 'it' => 'A2'],
+    ]);
+
+    Exceptions::assertReported(InvalidArgumentException::class);
+    expect(TranslationHandler::getOption('fileNames'))->toBe(['test']);
+});
+
+it('reports a failed php export after saving a group instead of failing the request', function () {
+    Exceptions::fake();
+
+    $translation = makeTranslation('auth.a', ['en' => 'A', 'it' => 'A']);
+    makeTranslation('auth.a.b', ['en' => 'B', 'it' => 'B']);
+    $group = TranslationGroup::create(['prefix' => 'auth']);
+
+    app(TranslationGroupRepository::class)->update($group->id, [
+        'prefix' => 'auth',
+        'published' => true,
+        'trans_'.$translation->id => ['en' => 'A2', 'it' => 'A2'],
+    ]);
+
+    Exceptions::assertReported(InvalidArgumentException::class);
+    expect($translation->translations()->where('locale', 'en')->value('value'))->toBe('A2')
+        ->and(TranslationHandler::getOption('fileNames'))->toBe(['test']);
 });
