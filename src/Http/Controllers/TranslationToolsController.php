@@ -8,6 +8,8 @@ use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Transl
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class TranslationToolsController extends Controller
 {
@@ -18,28 +20,28 @@ class TranslationToolsController extends Controller
 
     public function exportToCsv(Request $request)
     {
+        $csvDelimiter = $this->validatedCsvDelimiter($request);
+        $csvFileName = $this->workingCsvFileName();
+        $filePath = $this->csvPath().DIRECTORY_SEPARATOR.$csvFileName.'.csv';
+
         try {
-            $csvPath = config('translation-handler.csvPath', storage_path('lang'));
-            $csvFileName = config('translation-handler.csvFileName', 'translations').'.csv';
-            $filePath = $csvPath.DIRECTORY_SEPARATOR.$csvFileName;
-
-            // Remove any existing CSV to avoid merge failures with stale/malformed files.
-            if (File::exists($filePath)) {
-                File::delete($filePath);
-            }
-
-            TranslationHandler::setOption('csvDelimiter', $request->input('csv_delimiter', config('translation-handler.csvDelimiter', ';')))
+            TranslationHandler::setOption('csvDelimiter', $csvDelimiter)
+                ->setOption('csvFileName', $csvFileName)
                 ->export(TranslationOptions::DB, TranslationOptions::CSV, true);
-
-            TranslationHandler::resetOptions();
 
             if (! File::exists($filePath)) {
                 return redirect()->back()->with('error', 'CSV file was not generated.');
             }
 
-            return response()->download($filePath, $csvFileName)->deleteFileAfterSend(true);
+            $downloadName = config('translation-handler.csvFileName', 'translations').'.csv';
+
+            return response()->download($filePath, $downloadName)->deleteFileAfterSend(true);
         } catch (\Exception $e) {
+            File::delete($filePath);
+
             return redirect()->back()->with('error', 'Export failed: '.$e->getMessage());
+        } finally {
+            TranslationHandler::resetOptions();
         }
     }
 
@@ -49,26 +51,29 @@ class TranslationToolsController extends Controller
             'csv_file' => 'required|file|mimes:csv,txt',
         ]);
 
-        try {
-            $csvPath = config('translation-handler.csvPath', storage_path('lang'));
-            $csvFileName = config('translation-handler.csvFileName', 'translations').'.csv';
+        $csvDelimiter = $this->validatedCsvDelimiter($request);
+        $csvPath = $this->csvPath();
+        $csvFileName = $this->workingCsvFileName();
 
+        try {
             File::ensureDirectoryExists($csvPath);
 
-            $request->file('csv_file')->move($csvPath, $csvFileName);
+            $request->file('csv_file')->move($csvPath, $csvFileName.'.csv');
 
-            TranslationHandler::setOption('csvDelimiter', $request->input('csv_delimiter', config('translation-handler.csvDelimiter', ';')))
+            TranslationHandler::setOption('csvDelimiter', $csvDelimiter)
+                ->setOption('csvFileName', $csvFileName)
                 ->import(TranslationOptions::CSV, TranslationOptions::DB, true);
 
             TranslationHandler::resetOptions();
-
-            File::delete($csvPath.DIRECTORY_SEPARATOR.$csvFileName);
 
             TranslationHandler::export(TranslationOptions::DB, TranslationOptions::PHP, true);
 
             return redirect()->back()->with('status', 'Translations imported from CSV successfully.');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Import failed: '.$e->getMessage());
+        } finally {
+            File::delete($csvPath.DIRECTORY_SEPARATOR.$csvFileName.'.csv');
+            TranslationHandler::resetOptions();
         }
     }
 
@@ -76,32 +81,27 @@ class TranslationToolsController extends Controller
     {
         $group = TranslationGroup::findOrFail($id);
 
+        $csvFileName = $this->workingCsvFileName();
+        $filePath = $this->csvPath().DIRECTORY_SEPARATOR.$csvFileName.'.csv';
+
         try {
-            $csvPath = config('translation-handler.csvPath', storage_path('lang'));
-            // CsvFileHandler always writes to {csvPath}/{csvFileName}.csv
-            $defaultFilePath = $csvPath.DIRECTORY_SEPARATOR.config('translation-handler.csvFileName', 'translations').'.csv';
-
-            // Remove stale CSV so the handler starts fresh.
-            if (File::exists($defaultFilePath)) {
-                File::delete($defaultFilePath);
-            }
-
             TranslationHandler::setOption('fileNames', [$group->prefix])
+                ->setOption('csvFileName', $csvFileName)
                 ->export(TranslationOptions::DB, TranslationOptions::CSV, true);
 
-            TranslationHandler::resetOptions();
-
-            if (! File::exists($defaultFilePath)) {
+            if (! File::exists($filePath)) {
                 return redirect()->back()->with('error', 'CSV file was not generated.');
             }
 
             $downloadName = str_replace('.', '-', $group->prefix).'.csv';
 
-            return response()->download($defaultFilePath, $downloadName)->deleteFileAfterSend(true);
+            return response()->download($filePath, $downloadName)->deleteFileAfterSend(true);
         } catch (\Exception $e) {
-            TranslationHandler::resetOptions();
+            File::delete($filePath);
 
             return redirect()->back()->with('error', 'Export failed: '.$e->getMessage());
+        } finally {
+            TranslationHandler::resetOptions();
         }
     }
 
@@ -113,30 +113,61 @@ class TranslationToolsController extends Controller
             'csv_file' => 'required|file|mimes:csv,txt',
         ]);
 
-        try {
-            $csvPath = config('translation-handler.csvPath', storage_path('lang'));
-            $csvFileName = config('translation-handler.csvFileName', 'translations').'.csv';
+        $csvDelimiter = $this->validatedCsvDelimiter($request);
+        $csvPath = $this->csvPath();
+        $csvFileName = $this->workingCsvFileName();
 
+        try {
             File::ensureDirectoryExists($csvPath);
 
-            $request->file('csv_file')->move($csvPath, $csvFileName);
+            $request->file('csv_file')->move($csvPath, $csvFileName.'.csv');
 
-            TranslationHandler::setOption('csvDelimiter', $request->input('csv_delimiter', config('translation-handler.csvDelimiter', ';')))
+            TranslationHandler::setOption('csvDelimiter', $csvDelimiter)
+                ->setOption('csvFileName', $csvFileName)
                 ->setOption('fileNames', [$group->prefix])
                 ->import(TranslationOptions::CSV, TranslationOptions::DB, true);
 
-            File::delete($csvPath.DIRECTORY_SEPARATOR.$csvFileName);
-
-            TranslationHandler::setOption('fileNames', [$group->prefix])
+            TranslationHandler::setOption('fileNames', [$group->getFileName()])
                 ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
-
-            TranslationHandler::resetOptions();
 
             return redirect()->back()->with('status', 'Translations imported from CSV successfully.');
         } catch (\Exception $e) {
-            TranslationHandler::resetOptions();
-
             return redirect()->back()->with('error', 'Import failed: '.$e->getMessage());
+        } finally {
+            File::delete($csvPath.DIRECTORY_SEPARATOR.$csvFileName.'.csv');
+            TranslationHandler::resetOptions();
         }
+    }
+
+    private function csvPath(): string
+    {
+        return config('translation-handler.csvPath', storage_path('lang'));
+    }
+
+    /**
+     * A CSV file name (without extension) unique to this request, so that
+     * concurrent editors never read, overwrite or delete each other's file.
+     */
+    private function workingCsvFileName(): string
+    {
+        return config('translation-handler.csvFileName', 'translations').'-'.Str::random(16);
+    }
+
+    /**
+     * The delimiter must be one of those the forms offer: fputcsv() throws a
+     * ValueError (not an Exception) on anything but a single character.
+     * The forms send "tab" for a tab: TrimStrings would strip a literal one.
+     */
+    private function validatedCsvDelimiter(Request $request): string
+    {
+        $default = config('translation-handler.csvDelimiter', ';');
+
+        $request->validate([
+            'csv_delimiter' => ['nullable', 'string', Rule::in(array_unique([';', ',', 'tab', "\t", $default]))],
+        ]);
+
+        $delimiter = $request->input('csv_delimiter') ?? $default;
+
+        return $delimiter === 'tab' ? "\t" : $delimiter;
     }
 }

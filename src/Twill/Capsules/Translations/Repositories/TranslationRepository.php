@@ -7,6 +7,7 @@ use A17\Twill\Repositories\Behaviors\HandleTranslations;
 use A17\Twill\Repositories\ModuleRepository;
 use BrunosCode\TranslationHandler\Data\TranslationOptions;
 use BrunosCode\TranslationHandler\Facades\TranslationHandler;
+use BrunosCode\TwillTranslationHandler\Support\Like;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -22,17 +23,27 @@ class TranslationRepository extends ModuleRepository
     public function filter(Builder $query, array $scopes = []): Builder
     {
         if (! empty($scopes['search'])) {
-            $search = $scopes['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('key', 'like', "%{$search}%")
-                    ->orWhereHas('translations', function ($q) use ($search) {
-                        $q->where('value', 'like', "%{$search}%");
-                    });
-            });
+            $this->search($query, $scopes['search']);
             unset($scopes['search']);
         }
 
         return parent::filter($query, $scopes);
+    }
+
+    /**
+     * Match keys and values containing the term, used by the listing search box.
+     *
+     * @param  Builder<Translation>  $query
+     * @return Builder<Translation>
+     */
+    public function search(Builder $query, string $search): Builder
+    {
+        return $query->where(function ($q) use ($search) {
+            Like::contains($q, 'key', $search)
+                ->orWhereHas('translations', function ($q) use ($search) {
+                    Like::contains($q, 'value', $search);
+                });
+        });
     }
 
     public function update(int|string $id, array $fields): TwillModelContract
@@ -59,9 +70,11 @@ class TranslationRepository extends ModuleRepository
 
             TranslationHandler::setOption('fileNames', [$prefix])
                 ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
-
-            TranslationHandler::resetOptions();
         } catch (\Throwable $e) {
+            // The value is saved: a failed export must not lose it, but it
+            // leaves the lang files stale, so it has to reach the logs.
+            report($e);
+        } finally {
             TranslationHandler::resetOptions();
         }
 

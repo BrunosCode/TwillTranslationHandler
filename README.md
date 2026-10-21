@@ -8,7 +8,7 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/brunoscode/twill-translation-handler.svg?style=flat-square)](https://packagist.org/packages/brunoscode/twill-translation-handler)
 [![License](https://img.shields.io/packagist/l/brunoscode/twill-translation-handler.svg?style=flat-square)](LICENSE.md)
 
-> **Twill compatibility:** Currently supports **Twill 3** (Laravel 11–12, PHP 8.2+). Twill 2 support is available in the `v0.x` releases.
+> **Twill compatibility:** Currently supports **Twill 3** (Laravel 11–13, PHP 8.2+). Twill 2 support is available in the `v0.x` releases.
 
 ## Table of Contents
 
@@ -34,14 +34,15 @@
 
 | Package version | PHP | Laravel | Twill |
 |-----------------|-----|---------|-------|
-| **v2.2** | 8.2 · 8.3 · 8.4 | 11 · 12 | 3.x |
+| **v2.4** | 8.2 · 8.3 · 8.4 | 11 · 12 · 13 | 3.x (3.6+ on Laravel 13) |
+| v2.2 | 8.2 · 8.3 · 8.4 | 11 · 12 | 3.x |
 | v2.0 | 8.2 · 8.3 | 11 | 3.x |
 | v1.x | 8.1+ | 10 | 2.x |
 
 ## Features
 
 - **Translation key management** — Browse and edit all translation keys and their per-locale values from a clean Twill module interface.
-- **Group-based organization** — Translations are automatically grouped by prefix (e.g. `messages`, `messages.validation`). Groups are created automatically on import and provide a focused editing view via Twill repeaters.
+- **Group-based organization** — Translations are automatically grouped by prefix (e.g. `messages`, `messages.validation`). Groups are created automatically on import, deleted once no key is left under them, and provide a focused editing view via Twill repeaters.
 - **Multi-locale support** — Edit translations for all configured locales side by side. Individual locale values can be marked active or inactive.
 - **Import / Export** — Sync translations between the database and CSV files:
   - Import from PHP files to populate the database
@@ -52,9 +53,11 @@
 
 ## Requirements
 
-- PHP 8.2, 8.3, or 8.4
-- Laravel 11 or 12
-- Twill 3.x
+| Laravel | PHP | Twill |
+|---------|-----|-------|
+| 11 | 8.2 · 8.3 · 8.4 | 3.x |
+| 12 | 8.2 · 8.3 · 8.4 | 3.x |
+| 13 | 8.3 · 8.4 | 3.6+ |
 
 ## Installation
 
@@ -62,17 +65,23 @@
 composer require brunoscode/twill-translation-handler
 ```
 
+> **Publish the config (step below).** Without it, the core package's defaults win the config merge: translations go through the core `DatabaseHandler`, so groups are never created, only the `en` locale is handled and imports default to JSON instead of the database.
+
 Run the migrations:
 
 ```bash
 php artisan migrate
 ```
 
+The package loads its own migrations: they create `translation_keys` and `translation_values` when missing, or add the Twill columns to the tables of an existing LaravelTranslationHandler install. Do not publish the core migrations afterwards: they create the same tables without checking whether they exist, so `migrate` would fail.
+
 Publish the config file:
 
 ```bash
 php artisan vendor:publish --tag="twill-translation-handler-config"
 ```
+
+Both this package and LaravelTranslationHandler publish `config/translation-handler.php`. Publish **this** one: it holds every core option plus the Twill defaults (`dbHandlerClass`, database as source of truth, `legacy-twill-navigation`). Do not also run the core's `translation-handler-config` tag, it would overwrite the file with the core defaults.
 
 Optionally publish the views to customise them:
 
@@ -150,26 +159,33 @@ return [
 // config/translation-handler.php
 
 return [
-    'keyDelimiter' => '.',          // Separator used in nested translation keys
+    'legacy-twill-navigation' => true,  // Register the menu via twill-navigation (see Navigation)
 
-    'fileNames' => ['messages'],    // PHP file names to sync (without .php extension)
-    'locales'   => ['en', 'it'],    // Supported locales
+    'keyDelimiter' => '.',              // Separator used in nested translation keys
 
-    // Default import/export direction
+    'fileNames' => ['messages'],        // Lang files managed from the admin (without .php)
+    'locales'   => ['en', 'it'],        // Locales exported to the lang files
+
+    // The database is the source of truth
     'defaultImportFrom' => TranslationOptions::PHP,
     'defaultImportTo'   => TranslationOptions::DB,
     'defaultExportFrom' => TranslationOptions::DB,
     'defaultExportTo'   => TranslationOptions::PHP,
 
-    'phpPath'      => lang_path(),          // Path to PHP language files
-    'csvDelimiter' => ';',                  // CSV column delimiter
-    'csvFileName'  => 'translations',       // Default CSV file name
-    'csvPath'      => storage_path('lang'), // Directory for CSV files
-    'jsonPath'     => lang_path(),          // Path to JSON language files
+    'dbHandlerClass' => DatabaseHandler::class, // Twill handler: also creates the groups
+
+    'phpPath'           => lang_path(),          // Path to PHP language files
+    'csvDelimiter'      => ';',                  // Default CSV column delimiter
+    'csvEscapeFormulas' => true,                 // Neutralise spreadsheet formulas in CSV exports
+    'csvFileName'       => 'translations',       // Download name of the admin CSV export
+    'csvPath'           => storage_path('lang'), // Must be writable by the web server
+    // ... plus the JSON and `check` options of the core
 ];
 ```
 
 See [LaravelTranslationHandler](https://github.com/BrunosCode/LaravelTranslationHandler) for the full list of configuration options.
+
+`locales` decides which locales are exported to the lang files, and the group edit page offers exactly those. The key edit page uses Twill's `translatable.locales` instead: keep the two lists identical, otherwise a value saved for a locale missing from `locales` stays in the database and never reaches a lang file.
 
 ## Usage
 
@@ -177,11 +193,11 @@ Once installed, a **Translations** section will appear in the Twill admin naviga
 
 ### Keys
 
-Lists all translation keys stored in the database. Each key can be opened to edit its translated value for every configured locale. Translation keys are managed exclusively through import — manual creation is intentionally disabled to keep the database in sync with source files.
+Lists all translation keys stored in the database. Each key can be opened to edit its translated value for every configured locale. Translation keys are managed exclusively through import — manual creation is intentionally disabled to keep the database in sync with source files. The search box matches both keys and values.
 
 ### Groups
 
-Lists all translation groups, auto-generated from the key prefixes. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form.
+Lists all translation groups, auto-generated from the key prefixes. Every import or sync into the database creates the missing groups and deletes the ones no key belongs to any more. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form. The search box matches prefixes, keys and values.
 
 ### Import / Export
 
@@ -222,7 +238,7 @@ Opening a group shows the **prefix** (read-only) and one textarea per translatio
 
 Field naming: each textarea is internally keyed as `trans_<id>` where `<id>` is the `translation_keys.id`. This is transparent to editors but relevant if you extend the form.
 
-Saving a group writes all locale values and immediately exports the affected PHP language file.
+Saving a group writes all locale values, marks them active and immediately exports the affected PHP language file. The save is refused with a validation error, before anything is written, when it would leave the lang file with a key that is both a value and a parent (e.g. `auth.a` and `auth.a.b`), or when it carries a locale missing from `translation-handler.locales`.
 
 ### allow_empty
 
@@ -231,7 +247,7 @@ Both modules show an **Allow empty** checkbox in the sidebar. Its effect is on f
 | Module | `allow_empty` unchecked | `allow_empty` checked |
 |--------|------------------------|----------------------|
 | **Keys** | Value is `required` for every locale | Value is `nullable` — empty strings are accepted |
-| **Groups** | Every locale value of every key is `required` | No validation — any combination of values is accepted |
+| **Groups** | Every locale value of every key is `required` | Empty values are accepted (locale and key conflict checks still apply) |
 
 When a value reaches the repository as `null` (e.g. the editor cleared a field), it is normalised to an empty string before being persisted. This means the database never stores `null` in `translation_values.value` through a form save.
 

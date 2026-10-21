@@ -76,3 +76,17 @@ it('does not match keys that only start with prefix string', function () {
 
     expect($group->getTranslationsQuery()->count())->toBe(1);
 });
+
+it('resolves the lang file name from the first prefix segment', function () {
+    expect((new TranslationGroup(['prefix' => 'auth']))->getFileName())->toBe('auth')
+        ->and((new TranslationGroup(['prefix' => 'auth.messages.errors']))->getFileName())->toBe('auth');
+});
+
+it('treats like wildcards in the prefix literally', function () {
+    $group = TranslationGroup::create(['prefix' => 'a_b']);
+
+    Translation::create(['key' => 'axb.wrong']);
+    Translation::create(['key' => 'a_b.right']);
+
+    expect($group->getTranslationsQuery()->pluck('key')->all())->toBe(['a_b.right']);
+});

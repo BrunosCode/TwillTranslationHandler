@@ -70,3 +70,20 @@ it('can delete a translation via repository', function () {
     expect(Translation::count())->toBe(0)
         ->and(Translation::withTrashed()->count())->toBe(1);
 });
+
+it('treats like wildcards in the search literally', function () {
+    Translation::create(['key' => 'test.percent'])
+        ->translations()->create(['locale' => 'en', 'value' => '100% sure', 'active' => true]);
+    Translation::create(['key' => 'test.plain'])
+        ->translations()->create(['locale' => 'en', 'value' => 'Plain', 'active' => true]);
+    Translation::create(['key' => 'test.under_score']);
+
+    $search = fn (string $term) => $this->repository
+        ->filter(Translation::query(), ['search' => $term])
+        ->orderBy('key')
+        ->pluck('key')
+        ->all();
+
+    expect($search('%'))->toBe(['test.percent'])
+        ->and($search('_'))->toBe(['test.under_score']);
+});

@@ -1,5 +1,6 @@
 <?php
 
+use BrunosCode\TranslationHandler\Facades\TranslationHandler;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -278,4 +279,169 @@ it('returns error on group import when delimiter does not match file', function 
 it('throws ModelNotFoundException when exporting a non-existent group', function () {
     expect(fn () => TranslationGroup::findOrFail(999))
         ->toThrow(ModelNotFoundException::class);
+});
+
+it('exports a nested group csv import into the top-level php file', function () {
+    Translation::create(['key' => 'auth.failed', 'published' => true])
+        ->translations()->createMany([
+            ['locale' => 'en', 'value' => 'Failed', 'active' => true],
+            ['locale' => 'it', 'value' => 'Fallito', 'active' => true],
+        ]);
+    $group = TranslationGroup::create(['prefix' => 'auth.messages', 'published' => true]);
+
+    $file = makeCsv([
+        ['key', 'en', 'it'],
+        ['auth.messages.hello', 'Hello', 'Ciao'],
+    ], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationGroups.importCsv', $group->id), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(File::exists($this->tmpDir.'/en/auth.messages.php'))->toBeFalse()
+        ->and(require $this->tmpDir.'/en/auth.php')->toBe([
+            'failed' => 'Failed',
+            'messages' => ['hello' => 'Hello'],
+        ]);
+});
+
+// ---------------------------------------------------------------------------
+// csv_delimiter validation and option reset
+// ---------------------------------------------------------------------------
+
+it('rejects an invalid csv delimiter on export with a validation error', function () {
+    Translation::create(['key' => 'test.hello', 'published' => true])
+        ->translations()->create(['locale' => 'en', 'value' => 'Hello', 'active' => true]);
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.exportToCsv'), ['csv_delimiter' => ';;'])
+        ->assertRedirect()
+        ->assertSessionHasErrors('csv_delimiter');
+});
+
+it('rejects an invalid csv delimiter on import with a validation error', function () {
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => '|',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasErrors('csv_delimiter');
+
+    expect(Translation::count())->toBe(0);
+});
+
+it('rejects an invalid csv delimiter on group import with a validation error', function () {
+    $group = TranslationGroup::create(['prefix' => 'test', 'published' => true]);
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationGroups.importCsv', $group->id), [
+            'csv_file' => $file,
+            'csv_delimiter' => 'ab',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasErrors('csv_delimiter');
+});
+
+it('resets the service options when a csv import fails', function () {
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ',');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => "\t",
+        ])
+        ->assertSessionHas('error');
+
+    expect(TranslationHandler::getOption('csvDelimiter'))->toBe(';');
+});
+
+// TrimStrings strips a literal tab from the request, so the forms send "tab".
+it('offers the tab delimiter as a named value that survives TrimStrings', function () {
+    $template = File::get(__DIR__.'/../resources/views/tools/index.blade.php');
+
+    expect(substr_count($template, 'value="tab"'))->toBe(2)
+        ->and($template)->not->toContain('value="&#9;"');
+});
+
+it('imports csv with the named tab delimiter', function () {
+    $file = makeCsv([
+        ['key', 'en', 'it'],
+        ['test.hello', 'Hello', 'Ciao'],
+    ], "\t");
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => 'tab',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(Translation::where('key', 'test.hello')->value('key'))->toBe('test.hello');
+});
+
+// ---------------------------------------------------------------------------
+// Per-request working files (concurrent editors)
+// ---------------------------------------------------------------------------
+
+it('exports without touching a csv another request is working on', function () {
+    File::put($this->tmpDir.'/translations.csv', 'in use');
+    Translation::create(['key' => 'test.hello', 'published' => true])
+        ->translations()->create(['locale' => 'en', 'value' => 'Hello', 'active' => true]);
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.exportToCsv'), ['csv_delimiter' => ';'])
+        ->assertDownload('translations.csv');
+
+    expect(File::get($this->tmpDir.'/translations.csv'))->toBe('in use');
+});
+
+it('imports without touching a csv another request is working on', function () {
+    File::put($this->tmpDir.'/translations.csv', 'in use');
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('status');
+
+    expect(File::get($this->tmpDir.'/translations.csv'))->toBe('in use')
+        ->and(File::glob($this->tmpDir.'/*.csv'))->toHaveCount(1);
+});
+
+it('removes its working file when a csv import fails', function () {
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ',');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('error');
+
+    expect(File::glob($this->tmpDir.'/*.csv'))->toBe([]);
+});
+
+it('removes its working file when a group csv import fails', function () {
+    $group = TranslationGroup::create(['prefix' => 'test', 'published' => true]);
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ',');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationGroups.importCsv', $group->id), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('error');
+
+    expect(File::glob($this->tmpDir.'/*.csv'))->toBe([]);
 });
