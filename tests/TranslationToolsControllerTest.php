@@ -387,3 +387,61 @@ it('imports csv with the named tab delimiter', function () {
 
     expect(Translation::where('key', 'test.hello')->value('key'))->toBe('test.hello');
 });
+
+// ---------------------------------------------------------------------------
+// Per-request working files (concurrent editors)
+// ---------------------------------------------------------------------------
+
+it('exports without touching a csv another request is working on', function () {
+    File::put($this->tmpDir.'/translations.csv', 'in use');
+    Translation::create(['key' => 'test.hello', 'published' => true])
+        ->translations()->create(['locale' => 'en', 'value' => 'Hello', 'active' => true]);
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.exportToCsv'), ['csv_delimiter' => ';'])
+        ->assertDownload('translations.csv');
+
+    expect(File::get($this->tmpDir.'/translations.csv'))->toBe('in use');
+});
+
+it('imports without touching a csv another request is working on', function () {
+    File::put($this->tmpDir.'/translations.csv', 'in use');
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('status');
+
+    expect(File::get($this->tmpDir.'/translations.csv'))->toBe('in use')
+        ->and(File::glob($this->tmpDir.'/*.csv'))->toHaveCount(1);
+});
+
+it('removes its working file when a csv import fails', function () {
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ',');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('error');
+
+    expect(File::glob($this->tmpDir.'/*.csv'))->toBe([]);
+});
+
+it('removes its working file when a group csv import fails', function () {
+    $group = TranslationGroup::create(['prefix' => 'test', 'published' => true]);
+    $file = makeCsv([['key', 'en', 'it'], ['test.hello', 'Hello', 'Ciao']], ',');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationGroups.importCsv', $group->id), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertSessionHas('error');
+
+    expect(File::glob($this->tmpDir.'/*.csv'))->toBe([]);
+});

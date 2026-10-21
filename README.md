@@ -175,7 +175,7 @@ return [
     'phpPath'           => lang_path(),          // Path to PHP language files
     'csvDelimiter'      => ';',                  // Default CSV column delimiter
     'csvEscapeFormulas' => true,                 // Neutralise spreadsheet formulas in CSV exports
-    'csvFileName'       => 'translations',       // CSV file name used by import/export
+    'csvFileName'       => 'translations',       // Download name of the admin CSV export
     'csvPath'           => storage_path('lang'), // Must be writable by the web server
     // ... plus the JSON and `check` options of the core
 ];

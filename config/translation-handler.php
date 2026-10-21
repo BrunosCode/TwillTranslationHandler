@@ -55,6 +55,8 @@ return [
     // carriage return are written with a leading ' so spreadsheet apps do not
     // evaluate them as formulas. The quote is stripped again on import.
     'csvEscapeFormulas' => true,
+    // The admin downloads exports with this name; its working files in csvPath
+    // get a random suffix per request, so concurrent editors do not collide.
     'csvFileName' => 'translations',
     // Must be writable by the web server: the admin CSV import and export
     // go through this directory.
