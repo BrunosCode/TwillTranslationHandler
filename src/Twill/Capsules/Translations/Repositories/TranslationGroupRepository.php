@@ -26,29 +26,40 @@ class TranslationGroupRepository extends ModuleRepository
         TranslationGroup::selectTranslationsCount($query);
 
         if (! empty($scopes['search'])) {
-            $search = $scopes['search'];
-            [$keyInGroup, $bindings] = TranslationGroup::keyInGroupCondition();
-
-            $query->where(function ($q) use ($search, $keyInGroup, $bindings) {
-                Like::contains($q, 'prefix', $search)
-                    ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
-                        $sub->select(DB::raw(1))
-                            ->from('translation_keys')
-                            ->whereRaw($keyInGroup, $bindings);
-                        Like::contains($sub, 'translation_keys.key', $search);
-                    })
-                    ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
-                        $sub->select(DB::raw(1))
-                            ->from('translation_values')
-                            ->join('translation_keys', 'translation_keys.id', '=', 'translation_values.translation_key_id')
-                            ->whereRaw($keyInGroup, $bindings);
-                        Like::contains($sub, 'translation_values.value', $search);
-                    });
-            });
+            $this->search($query, $scopes['search']);
             unset($scopes['search']);
         }
 
         return parent::filter($query, $scopes);
+    }
+
+    /**
+     * Match groups whose prefix, keys or values contain the term, used by the
+     * listing search box.
+     *
+     * @param  Builder<TranslationGroup>  $query
+     * @return Builder<TranslationGroup>
+     */
+    public function search(Builder $query, string $search): Builder
+    {
+        [$keyInGroup, $bindings] = TranslationGroup::keyInGroupCondition();
+
+        return $query->where(function ($q) use ($search, $keyInGroup, $bindings) {
+            Like::contains($q, 'prefix', $search)
+                ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
+                    $sub->select(DB::raw(1))
+                        ->from('translation_keys')
+                        ->whereRaw($keyInGroup, $bindings);
+                    Like::contains($sub, 'translation_keys.key', $search);
+                })
+                ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
+                    $sub->select(DB::raw(1))
+                        ->from('translation_values')
+                        ->join('translation_keys', 'translation_keys.id', '=', 'translation_values.translation_key_id')
+                        ->whereRaw($keyInGroup, $bindings);
+                    Like::contains($sub, 'translation_values.value', $search);
+                });
+        });
     }
 
     public function getFormFields(TwillModelContract $object): array

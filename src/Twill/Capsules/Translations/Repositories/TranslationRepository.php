@@ -23,17 +23,27 @@ class TranslationRepository extends ModuleRepository
     public function filter(Builder $query, array $scopes = []): Builder
     {
         if (! empty($scopes['search'])) {
-            $search = $scopes['search'];
-            $query->where(function ($q) use ($search) {
-                Like::contains($q, 'key', $search)
-                    ->orWhereHas('translations', function ($q) use ($search) {
-                        Like::contains($q, 'value', $search);
-                    });
-            });
+            $this->search($query, $scopes['search']);
             unset($scopes['search']);
         }
 
         return parent::filter($query, $scopes);
+    }
+
+    /**
+     * Match keys and values containing the term, used by the listing search box.
+     *
+     * @param  Builder<Translation>  $query
+     * @return Builder<Translation>
+     */
+    public function search(Builder $query, string $search): Builder
+    {
+        return $query->where(function ($q) use ($search) {
+            Like::contains($q, 'key', $search)
+                ->orWhereHas('translations', function ($q) use ($search) {
+                    Like::contains($q, 'value', $search);
+                });
+        });
     }
 
     public function update(int|string $id, array $fields): TwillModelContract

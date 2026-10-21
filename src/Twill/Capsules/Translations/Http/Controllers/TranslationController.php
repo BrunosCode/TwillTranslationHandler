@@ -3,41 +3,49 @@
 namespace BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Http\Controllers;
 
 use A17\Twill\Http\Controllers\Admin\ModuleController;
+use A17\Twill\Services\Listings\Columns\Text;
+use A17\Twill\Services\Listings\TableColumn;
+use A17\Twill\Services\Listings\TableColumns;
+use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationRepository;
+use Illuminate\Database\Eloquent\Builder;
 
 class TranslationController extends ModuleController
 {
     protected $moduleName = 'translations';
 
-    protected $titleColumnKey = 'key';
+    protected function setUpController(): void
+    {
+        $this->setTitleColumnKey('key');
+        $this->setTitleColumnLabel('Key');
+        $this->setTitleFormKey('key');
 
-    protected $titleFormKey = 'key';
+        // Keys are created by imports only, and the lang files own them.
+        $this->disableCreate();
+        $this->disableDelete();
+        $this->disableBulkDelete();
+        $this->disablePublish();
+        $this->disableBulkPublish();
+        $this->disableEditor();
 
-    protected $indexColumns = [
-        'key' => [
-            'title' => 'Key',
-            'field' => 'key',
-            'sort' => true,
-        ],
-        'value' => [
-            'title' => 'Value',
-            'field' => 'value',
-            'html' => true,
-        ],
-    ];
+        // The search box matches keys and values through the repository,
+        // instead of Twill's default LIKE on the title column.
+        $this->setSearchColumns([]);
+        $this->setSearchQuery(fn (Builder $query, string $search) => app(TranslationRepository::class)->search($query, $search));
+    }
 
-    protected $defaultOrders = ['key' => 'asc'];
+    protected function getIndexTableColumns(): TableColumns
+    {
+        $columns = parent::getIndexTableColumns();
 
-    protected $defaultFilters = ['search' => 'search'];
+        $columns->first(fn (TableColumn $column) => $column->getField() === 'key')?->sortByDefault();
 
-    protected $disableEditor = true;
+        return $columns;
+    }
 
-    protected $indexOptions = [
-        'create' => false,
-        'delete' => false,
-        'publish' => false,
-        'bulkPublish' => false,
-        'bulkDelete' => false,
-        'feature' => false,
-        'bulkFeature' => false,
-    ];
+    protected function additionalIndexTableColumns(): TableColumns
+    {
+        return TableColumns::make([
+            Text::make()->field('value')->title('Value')->renderHtml(),
+        ]);
+    }
 }

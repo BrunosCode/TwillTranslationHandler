@@ -3,19 +3,36 @@
 namespace BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Http\Controllers;
 
 use A17\Twill\Http\Controllers\Admin\ModuleController;
-use A17\Twill\Models\Contracts\TwillModelContract;
-use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
+use A17\Twill\Services\Listings\Columns\Text;
+use A17\Twill\Services\Listings\TableColumn;
+use A17\Twill\Services\Listings\TableColumns;
+use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationGroupRepository;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class TranslationGroupController extends ModuleController
 {
     protected $moduleName = 'translationGroups';
 
-    protected $titleColumnKey = 'prefix';
+    protected function setUpController(): void
+    {
+        $this->setTitleColumnKey('prefix');
+        $this->setTitleColumnLabel('Prefix');
+        $this->setTitleFormKey('prefix');
 
-    protected $titleFormKey = 'prefix';
+        // Groups follow the keys: imports create and delete them.
+        $this->disableCreate();
+        $this->disableDelete();
+        $this->disableBulkDelete();
+        $this->disablePublish();
+        $this->disableBulkPublish();
+        $this->disableEditor();
 
-    protected $disableEditor = true;
+        // The search box matches prefixes, keys and values through the
+        // repository, instead of Twill's default LIKE on the title column.
+        $this->setSearchColumns([]);
+        $this->setSearchQuery(fn (Builder $query, string $search) => app(TranslationGroupRepository::class)->search($query, $search));
+    }
 
     protected function getViewPrefix(): ?string
     {
@@ -42,37 +59,20 @@ class TranslationGroupController extends ModuleController
         ];
     }
 
-    protected $indexColumns = [
-        'prefix' => [
-            'title' => 'Prefix',
-            'field' => 'prefix',
-            'sort' => true,
-        ],
-        'translations_count' => [
-            'title' => 'Translations',
-            'field' => 'translations_count',
-        ],
-    ];
-
-    protected $defaultOrders = ['prefix' => 'asc'];
-
-    protected $defaultFilters = ['search' => 'search'];
-
-    protected $indexOptions = [
-        'create' => false,
-        'publish' => false,
-        'bulkPublish' => false,
-        'feature' => false,
-        'bulkFeature' => false,
-        'delete' => false,
-        'bulkDelete' => false,
-    ];
-
-    protected function indexItemData(TwillModelContract $item): array
+    protected function getIndexTableColumns(): TableColumns
     {
-        /** @var TranslationGroup $item */
-        return [
-            'translations_count' => $item->translations_count,
-        ];
+        $columns = parent::getIndexTableColumns();
+
+        $columns->first(fn (TableColumn $column) => $column->getField() === 'prefix')?->sortByDefault();
+
+        return $columns;
+    }
+
+    protected function additionalIndexTableColumns(): TableColumns
+    {
+        // Loaded by TranslationGroupRepository::filter() with a subquery.
+        return TableColumns::make([
+            Text::make()->field('translations_count')->title('Translations'),
+        ]);
     }
 }
