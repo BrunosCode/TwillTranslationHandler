@@ -73,7 +73,7 @@ Run the migrations:
 php artisan migrate
 ```
 
-The package loads its own migrations: they create `translation_keys` and `translation_values` when missing, or add the Twill columns to the tables of an existing LaravelTranslationHandler install. Do not publish the core migrations afterwards: they create the same tables without checking whether they exist, so `migrate` would fail.
+The package loads its own migrations: they create `translation_keys` and `translation_values` when missing, or add the Twill columns to the tables of an existing LaravelTranslationHandler install. You do not need the core migrations. If you publish them anyway, they skip the tables that already exist (since LaravelTranslationHandler v2.8.1), so `migrate` keeps working in either order.
 
 Publish the config file:
 

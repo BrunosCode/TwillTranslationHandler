@@ -2,6 +2,14 @@
 
 All notable changes to `TwillTranslationHandler` will be documented in this file.
 
+## v2.4.1 — Core 2.8.1 - 2026-10-21
+
+**Full changelog:** [v2.4.0...v2.4.1](https://github.com/BrunosCode/TwillTranslationHandler/compare/v2.4.0...v2.4.1)
+
+### Changed
+
+- **`laravel-translation-handler` updated to `^2.8.1`.** The core migration stubs now skip tables that already exist, so publishing them after this package's migrations no longer makes `migrate` fail. The README no longer warns against publishing them.
+
 ## v2.4.0 — Core 2.8 alignment & Laravel 13 - 2026-10-21
 
 **Full changelog:** [v2.3.0...v2.4.0](https://github.com/BrunosCode/TwillTranslationHandler/compare/v2.3.0...v2.4.0)
