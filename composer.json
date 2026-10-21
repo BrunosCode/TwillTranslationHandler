@@ -1,6 +1,6 @@
 {
     "name": "brunoscode/twill-translation-handler",
-    "description": "This is my package twill-translation-handler",
+    "description": "Manage Laravel translations from the Twill 3 admin: edit keys and groups, import and export CSV, keep the lang files in sync.",
     "keywords": [
         "TwillTranslationHandler",
         "laravel",
