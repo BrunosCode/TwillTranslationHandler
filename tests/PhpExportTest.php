@@ -78,20 +78,18 @@ it('reports a failed php export after saving a key', function () {
     expect(TranslationHandler::getOption('fileNames'))->toBe(['test']);
 });
 
-it('reports a failed php export after saving a group instead of failing the request', function () {
-    Exceptions::fake();
-
+it('refuses a group save into a conflicting lang file without writing anything', function () {
     $translation = makeTranslation('auth.a', ['en' => 'A', 'it' => 'A']);
     makeTranslation('auth.a.b', ['en' => 'B', 'it' => 'B']);
     $group = TranslationGroup::create(['prefix' => 'auth']);
 
-    app(TranslationGroupRepository::class)->update($group->id, [
+    // TranslationGroupRequest turns this into a validation error first.
+    expect(fn () => app(TranslationGroupRepository::class)->update($group->id, [
         'prefix' => 'auth',
         'published' => true,
         'trans_'.$translation->id => ['en' => 'A2', 'it' => 'A2'],
-    ]);
+    ]))->toThrow(InvalidArgumentException::class);
 
-    Exceptions::assertReported(InvalidArgumentException::class);
-    expect($translation->translations()->where('locale', 'en')->value('value'))->toBe('A2')
+    expect($translation->translations()->where('locale', 'en')->value('value'))->toBe('A')
         ->and(TranslationHandler::getOption('fileNames'))->toBe(['test']);
 });

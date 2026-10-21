@@ -4,6 +4,7 @@ use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Transl
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationGroupRepository;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 beforeEach(function () {
     $this->repository = app(TranslationGroupRepository::class);
@@ -189,4 +190,33 @@ it('ignores fields of keys that do not exist', function () {
     saveGroup($group, [999 => ['en' => 'Ghost']]);
 
     expect(Translation::count())->toBe(0);
+});
+
+it('saves a whole group with a constant number of queries', function () {
+    config(['translation-handler.phpPath' => $tmp = sys_get_temp_dir().'/th_save_'.uniqid()]);
+
+    $group = TranslationGroup::create(['prefix' => 'save']);
+    $values = [];
+
+    foreach (range(1, 30) as $i) {
+        $t = Translation::create(['key' => "save.k{$i}"]);
+        $t->translations()->createMany([
+            ['locale' => 'en', 'value' => 'old', 'active' => true],
+            ['locale' => 'it', 'value' => 'vecchio', 'active' => true],
+        ]);
+        $values[$t->id] = ['en' => "new {$i}", 'it' => "nuovo {$i}"];
+    }
+
+    DB::enableQueryLog();
+
+    saveGroup($group, $values);
+
+    // Was two queries per value (about 155 here).
+    expect(count(DB::getQueryLog()))->toBeLessThan(20)
+        ->and(storedValues(Translation::where('key', 'save.k30')->first()))->toBe([
+            'en' => ['new 30', true],
+            'it' => ['nuovo 30', true],
+        ]);
+
+    File::deleteDirectory($tmp);
 });
