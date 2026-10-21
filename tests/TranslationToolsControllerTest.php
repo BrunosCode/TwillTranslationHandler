@@ -362,3 +362,28 @@ it('resets the service options when a csv import fails', function () {
 
     expect(TranslationHandler::getOption('csvDelimiter'))->toBe(';');
 });
+
+// TrimStrings strips a literal tab from the request, so the forms send "tab".
+it('offers the tab delimiter as a named value that survives TrimStrings', function () {
+    $template = File::get(__DIR__.'/../resources/views/tools/index.blade.php');
+
+    expect(substr_count($template, 'value="tab"'))->toBe(2)
+        ->and($template)->not->toContain('value="&#9;"');
+});
+
+it('imports csv with the named tab delimiter', function () {
+    $file = makeCsv([
+        ['key', 'en', 'it'],
+        ['test.hello', 'Hello', 'Ciao'],
+    ], "\t");
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationTools.importFromCsv'), [
+            'csv_file' => $file,
+            'csv_delimiter' => 'tab',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(Translation::where('key', 'test.hello')->value('key'))->toBe('test.hello');
+});

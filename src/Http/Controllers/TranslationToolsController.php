@@ -148,15 +148,18 @@ class TranslationToolsController extends Controller
     /**
      * The delimiter must be one of those the forms offer: fputcsv() throws a
      * ValueError (not an Exception) on anything but a single character.
+     * The forms send "tab" for a tab: TrimStrings would strip a literal one.
      */
     private function validatedCsvDelimiter(Request $request): string
     {
         $default = config('translation-handler.csvDelimiter', ';');
 
         $request->validate([
-            'csv_delimiter' => ['nullable', 'string', Rule::in(array_unique([';', ',', "\t", $default]))],
+            'csv_delimiter' => ['nullable', 'string', Rule::in(array_unique([';', ',', 'tab', "\t", $default]))],
         ]);
 
-        return $request->input('csv_delimiter') ?? $default;
+        $delimiter = $request->input('csv_delimiter') ?? $default;
+
+        return $delimiter === 'tab' ? "\t" : $delimiter;
     }
 }

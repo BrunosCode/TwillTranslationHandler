@@ -35,7 +35,7 @@
                         <select name="csv_delimiter" style="font-size: 13px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;">
                             <option value=";" {{ config('translation-handler.csvDelimiter', ';') === ';' ? 'selected' : '' }}>; (semicolon)</option>
                             <option value="," {{ config('translation-handler.csvDelimiter', ';') === ',' ? 'selected' : '' }}>, (comma)</option>
-                            <option value="&#9;" {{ config('translation-handler.csvDelimiter', ';') === "\t" ? 'selected' : '' }}>⇥ (tab)</option>
+                            <option value="tab" {{ config('translation-handler.csvDelimiter', ';') === "\t" ? 'selected' : '' }}>⇥ (tab)</option>
                         </select>
                         <button type="submit" class="btn" style="background: #3182ce; color: #fff; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
                             Import
@@ -62,7 +62,7 @@
                         <select name="csv_delimiter" style="font-size: 13px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 4px;">
                             <option value=";" {{ config('translation-handler.csvDelimiter', ';') === ';' ? 'selected' : '' }}>; (semicolon)</option>
                             <option value="," {{ config('translation-handler.csvDelimiter', ';') === ',' ? 'selected' : '' }}>, (comma)</option>
-                            <option value="&#9;" {{ config('translation-handler.csvDelimiter', ';') === "\t" ? 'selected' : '' }}>⇥ (tab)</option>
+                            <option value="tab" {{ config('translation-handler.csvDelimiter', ';') === "\t" ? 'selected' : '' }}>⇥ (tab)</option>
                         </select>
                         <button type="submit" class="btn" style="background: #2f855a; color: #fff; padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px;">
                             Download CSV
