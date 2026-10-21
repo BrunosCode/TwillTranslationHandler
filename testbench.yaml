@@ -4,6 +4,7 @@ env:
 
 providers:
   - Workbench\App\Providers\WorkbenchServiceProvider
+  - BrunosCode\TwillTranslationHandler\TwillTranslationHandlerServiceProvider
 
 migrations:
   - workbench/database/migrations
