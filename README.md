@@ -8,7 +8,7 @@
 [![Total Downloads](https://img.shields.io/packagist/dt/brunoscode/twill-translation-handler.svg?style=flat-square)](https://packagist.org/packages/brunoscode/twill-translation-handler)
 [![License](https://img.shields.io/packagist/l/brunoscode/twill-translation-handler.svg?style=flat-square)](LICENSE.md)
 
-> **Twill compatibility:** Currently supports **Twill 3** (Laravel 11–12, PHP 8.2+). Twill 2 support is available in the `v0.x` releases.
+> **Twill compatibility:** Currently supports **Twill 3** (Laravel 11–13, PHP 8.2+). Twill 2 support is available in the `v0.x` releases.
 
 ## Table of Contents
 
@@ -34,7 +34,8 @@
 
 | Package version | PHP | Laravel | Twill |
 |-----------------|-----|---------|-------|
-| **v2.2** | 8.2 · 8.3 · 8.4 | 11 · 12 | 3.x |
+| **v2.4** | 8.2 · 8.3 · 8.4 | 11 · 12 · 13 | 3.x (3.6+ on Laravel 13) |
+| v2.2 | 8.2 · 8.3 · 8.4 | 11 · 12 | 3.x |
 | v2.0 | 8.2 · 8.3 | 11 | 3.x |
 | v1.x | 8.1+ | 10 | 2.x |
 
@@ -52,9 +53,11 @@
 
 ## Requirements
 
-- PHP 8.2, 8.3, or 8.4
-- Laravel 11 or 12
-- Twill 3.x
+| Laravel | PHP | Twill |
+|---------|-----|-------|
+| 11 | 8.2 · 8.3 · 8.4 | 3.x |
+| 12 | 8.2 · 8.3 · 8.4 | 3.x |
+| 13 | 8.3 · 8.4 | 3.6+ |
 
 ## Installation
 

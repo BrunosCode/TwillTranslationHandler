@@ -3,7 +3,7 @@
 ## Requirements
 
 - PHP 8.2+
-- Laravel 11
+- Laravel 11, 12 or 13
 - Twill 3.x
 - Composer
 - Node.js (for Twill asset build)
