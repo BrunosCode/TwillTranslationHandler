@@ -65,6 +65,8 @@
 composer require brunoscode/twill-translation-handler
 ```
 
+> **Publish the config (step below).** Without it, the core package's defaults win the config merge: translations go through the core `DatabaseHandler`, so groups are never created, only the `en` locale is handled and imports default to JSON instead of the database.
+
 Run the migrations:
 
 ```bash
