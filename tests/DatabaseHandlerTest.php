@@ -5,6 +5,7 @@ use BrunosCode\TranslationHandler\Data\Translation as TranslationData;
 use BrunosCode\TranslationHandler\Data\TranslationOptions;
 use BrunosCode\TranslationHandler\Facades\TranslationHandler;
 use BrunosCode\TwillTranslationHandler\DatabaseHandler;
+use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use Illuminate\Support\Facades\DB;
 
@@ -114,4 +115,35 @@ it('creates all missing groups with a single query', function () {
         ->and(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['test', 'test.a', 'test.a.b', 'test.x'])
         ->and(TranslationGroup::where('prefix', 'test.a')->first()->published)->toBeTruthy()
         ->and(TranslationGroup::where('prefix', 'test.a')->first()->created_at)->not->toBeNull();
+});
+
+it('deletes the groups left without keys after a sync', function () {
+    $handler = makeHandler();
+
+    $handler->put(makeCollection(['test.old.a', 'test.kept.b']));
+    expect(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['test', 'test.kept', 'test.old']);
+
+    $handler->put(makeCollection(['test.kept.b', 'test.new.c']));
+
+    expect(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['test', 'test.kept', 'test.new'])
+        ->and(TranslationGroup::withTrashed()->where('prefix', 'test.old')->exists())->toBeFalse();
+});
+
+it('keeps groups whose keys live outside the synced file names', function () {
+    TranslationGroup::create(['prefix' => 'other']);
+    TranslationGroup::create(['prefix' => 'other.nested']);
+    Translation::create(['key' => 'other.nested.key']);
+
+    makeHandler()->put(makeCollection(['test.a']));
+
+    expect(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['other', 'other.nested', 'test']);
+});
+
+it('deletes the groups of the file names it deletes', function () {
+    $handler = makeHandler();
+    $handler->put(makeCollection(['test.menu.home']));
+
+    $handler->delete();
+
+    expect(TranslationGroup::withTrashed()->count())->toBe(0);
 });

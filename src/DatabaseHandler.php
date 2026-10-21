@@ -12,11 +12,46 @@ use Illuminate\Support\Collection;
 
 class DatabaseHandler extends BaseDatabaseHandler implements DatabaseHandlerInterface
 {
+    public function put(TranslationCollection $translations, ?string $connection = null): int
+    {
+        $counter = parent::put($translations, $connection);
+
+        $this->pruneGroups($this->getDB($connection));
+
+        return $counter;
+    }
+
+    public function delete(?string $connection = null, bool $hardDelete = false): int
+    {
+        $counter = parent::delete($connection, $hardDelete);
+
+        $this->pruneGroups($this->getDB($connection));
+
+        return $counter;
+    }
+
     public function handleInsert(Connection $db, TranslationCollection $translations, ?string $filename = null, ?Collection $dbKeys = null): int
     {
         $this->syncGroups($translations);
 
         return parent::handleInsert($db, $translations, $filename, $dbKeys);
+    }
+
+    /**
+     * Delete the groups no live key belongs to any more. A group is only a
+     * container for a key prefix, so it is removed for good, not soft-deleted.
+     */
+    protected function pruneGroups(Connection $db): void
+    {
+        [$keyInGroup, $bindings] = TranslationGroup::keyInGroupCondition(TranslationHandler::getOption('keyDelimiter'));
+
+        $db->table('translation_groups')
+            ->whereNotExists(fn ($query) => $query
+                ->select($db->raw('1'))
+                ->from('translation_keys')
+                ->whereRaw($keyInGroup, $bindings)
+                ->whereNull('translation_keys.deleted_at'))
+            ->delete();
     }
 
     protected function syncGroups(TranslationCollection $translations): void

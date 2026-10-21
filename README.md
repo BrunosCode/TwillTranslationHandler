@@ -42,7 +42,7 @@
 ## Features
 
 - **Translation key management** — Browse and edit all translation keys and their per-locale values from a clean Twill module interface.
-- **Group-based organization** — Translations are automatically grouped by prefix (e.g. `messages`, `messages.validation`). Groups are created automatically on import and provide a focused editing view via Twill repeaters.
+- **Group-based organization** — Translations are automatically grouped by prefix (e.g. `messages`, `messages.validation`). Groups are created automatically on import, deleted once no key is left under them, and provide a focused editing view via Twill repeaters.
 - **Multi-locale support** — Edit translations for all configured locales side by side. Individual locale values can be marked active or inactive.
 - **Import / Export** — Sync translations between the database and CSV files:
   - Import from PHP files to populate the database
@@ -195,7 +195,7 @@ Lists all translation keys stored in the database. Each key can be opened to edi
 
 ### Groups
 
-Lists all translation groups, auto-generated from the key prefixes. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form.
+Lists all translation groups, auto-generated from the key prefixes. Every import or sync into the database creates the missing groups and deletes the ones no key belongs to any more. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form.
 
 ### Import / Export
 

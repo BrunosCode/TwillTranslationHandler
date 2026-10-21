@@ -40,9 +40,9 @@ class TranslationGroup extends Model
      *
      * @return array{0: string, 1: array<int, string>} the SQL and its bindings
      */
-    public static function keyInGroupCondition(): array
+    public static function keyInGroupCondition(?string $delimiter = null): array
     {
-        $delimiter = config('translation-handler.keyDelimiter', '.');
+        $delimiter ??= config('translation-handler.keyDelimiter', '.');
         $prefix = Like::escapeColumn('translation_groups.prefix');
 
         $sql = DB::connection()->getDriverName() === 'sqlite'
