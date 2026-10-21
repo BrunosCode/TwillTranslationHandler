@@ -76,3 +76,21 @@ it('returns only existing locale values for partial translations', function () {
     expect($fields['translations']['trans_'.$t->id]['en'])->toBe('English only')
         ->and($fields['translations']['trans_'.$t->id])->not->toHaveKey('it');
 });
+
+it('treats like wildcards in the search and in the group prefix literally', function () {
+    TranslationGroup::create(['prefix' => 'a_b']);
+    TranslationGroup::create(['prefix' => 'plain']);
+    Translation::create(['key' => 'axb.needle']);
+    Translation::create(['key' => 'plain.text'])
+        ->translations()->create(['locale' => 'en', 'value' => '100% sure', 'active' => true]);
+
+    $search = fn (string $term) => $this->repository
+        ->filter(TranslationGroup::query(), ['search' => $term])
+        ->orderBy('prefix')
+        ->pluck('prefix')
+        ->all();
+
+    expect($search('needle'))->toBe([])
+        ->and($search('%'))->toBe(['plain'])
+        ->and($search('_'))->toBe(['a_b']);
+});

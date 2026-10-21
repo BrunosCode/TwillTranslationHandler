@@ -3,6 +3,7 @@
 namespace BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models;
 
 use A17\Twill\Models\Model;
+use BrunosCode\TwillTranslationHandler\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -28,7 +29,7 @@ class TranslationGroup extends Model
     {
         $delimiter = config('translation-handler.keyDelimiter', '.');
 
-        return Translation::where('key', 'like', $this->prefix.$delimiter.'%')
+        return Like::startsWith(Translation::query(), 'key', $this->prefix.$delimiter)
             ->orderBy('key');
     }
 

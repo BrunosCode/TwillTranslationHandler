@@ -7,6 +7,7 @@ use A17\Twill\Repositories\Behaviors\HandleTranslations;
 use A17\Twill\Repositories\ModuleRepository;
 use BrunosCode\TranslationHandler\Data\TranslationOptions;
 use BrunosCode\TranslationHandler\Facades\TranslationHandler;
+use BrunosCode\TwillTranslationHandler\Support\Like;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -24,9 +25,9 @@ class TranslationRepository extends ModuleRepository
         if (! empty($scopes['search'])) {
             $search = $scopes['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('key', 'like', "%{$search}%")
+                Like::contains($q, 'key', $search)
                     ->orWhereHas('translations', function ($q) use ($search) {
-                        $q->where('value', 'like', "%{$search}%");
+                        Like::contains($q, 'value', $search);
                     });
             });
             unset($scopes['search']);

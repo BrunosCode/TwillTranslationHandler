@@ -6,6 +6,7 @@ use A17\Twill\Models\Contracts\TwillModelContract;
 use A17\Twill\Repositories\ModuleRepository;
 use BrunosCode\TranslationHandler\Data\TranslationOptions;
 use BrunosCode\TranslationHandler\Facades\TranslationHandler;
+use BrunosCode\TwillTranslationHandler\Support\Like;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationTranslation;
@@ -26,24 +27,26 @@ class TranslationGroupRepository extends ModuleRepository
             $delimiter = config('translation-handler.keyDelimiter', '.');
             $driver = DB::connection()->getDriverName();
 
+            $prefix = Like::escapeColumn('translation_groups.prefix');
             $concatKeyExpr = $driver === 'sqlite'
-                ? "translation_keys.key LIKE (translation_groups.prefix || ? || '%')"
-                : "translation_keys.key LIKE CONCAT(translation_groups.prefix, ?, '%')";
+                ? "translation_keys.key LIKE ({$prefix} || ? || '%') ESCAPE '!'"
+                : "translation_keys.key LIKE CONCAT({$prefix}, ?, '%') ESCAPE '!'";
+            $delimiter = Like::escape($delimiter);
 
             $query->where(function ($q) use ($search, $delimiter, $concatKeyExpr) {
-                $q->where('prefix', 'like', "%{$search}%")
+                Like::contains($q, 'prefix', $search)
                     ->orWhereExists(function ($sub) use ($search, $delimiter, $concatKeyExpr) {
                         $sub->select(DB::raw(1))
                             ->from('translation_keys')
-                            ->whereRaw($concatKeyExpr, [$delimiter])
-                            ->where('translation_keys.key', 'like', "%{$search}%");
+                            ->whereRaw($concatKeyExpr, [$delimiter]);
+                        Like::contains($sub, 'translation_keys.key', $search);
                     })
                     ->orWhereExists(function ($sub) use ($search, $delimiter, $concatKeyExpr) {
                         $sub->select(DB::raw(1))
                             ->from('translation_values')
                             ->join('translation_keys', 'translation_keys.id', '=', 'translation_values.translation_key_id')
-                            ->whereRaw($concatKeyExpr, [$delimiter])
-                            ->where('translation_values.value', 'like', "%{$search}%");
+                            ->whereRaw($concatKeyExpr, [$delimiter]);
+                        Like::contains($sub, 'translation_values.value', $search);
                     });
             });
             unset($scopes['search']);
