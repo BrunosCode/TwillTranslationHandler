@@ -105,7 +105,7 @@ class TranslationGroupRepository extends ModuleRepository
 
         $group = TranslationGroup::findOrFail($id);
 
-        TranslationHandler::setOption('fileNames', [$group->prefix])
+        TranslationHandler::setOption('fileNames', [$group->getFileName()])
             ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
 
         TranslationHandler::resetOptions();

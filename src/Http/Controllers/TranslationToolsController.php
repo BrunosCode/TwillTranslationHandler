@@ -127,7 +127,7 @@ class TranslationToolsController extends Controller
 
             File::delete($csvPath.DIRECTORY_SEPARATOR.$csvFileName);
 
-            TranslationHandler::setOption('fileNames', [$group->prefix])
+            TranslationHandler::setOption('fileNames', [$group->getFileName()])
                 ->export(TranslationOptions::DB, TranslationOptions::PHP, true);
 
             TranslationHandler::resetOptions();

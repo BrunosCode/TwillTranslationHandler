@@ -33,6 +33,17 @@ class TranslationGroup extends Model
     }
 
     /**
+     * The lang file the group's keys live in: its first prefix segment.
+     * A nested group ("auth.messages") is stored in "auth.php", not in a file of its own.
+     */
+    public function getFileName(): string
+    {
+        $delimiter = config('translation-handler.keyDelimiter', '.');
+
+        return explode($delimiter, $this->prefix)[0];
+    }
+
+    /**
      * Accessor used by HandleRepeaters to iterate translation items.
      *
      * @return Collection<int, Translation>

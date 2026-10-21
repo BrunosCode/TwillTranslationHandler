@@ -76,3 +76,8 @@ it('does not match keys that only start with prefix string', function () {
 
     expect($group->getTranslationsQuery()->count())->toBe(1);
 });
+
+it('resolves the lang file name from the first prefix segment', function () {
+    expect((new TranslationGroup(['prefix' => 'auth']))->getFileName())->toBe('auth')
+        ->and((new TranslationGroup(['prefix' => 'auth.messages.errors']))->getFileName())->toBe('auth');
+});

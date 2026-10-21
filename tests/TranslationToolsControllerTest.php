@@ -279,3 +279,31 @@ it('throws ModelNotFoundException when exporting a non-existent group', function
     expect(fn () => TranslationGroup::findOrFail(999))
         ->toThrow(ModelNotFoundException::class);
 });
+
+it('exports a nested group csv import into the top-level php file', function () {
+    Translation::create(['key' => 'auth.failed', 'published' => true])
+        ->translations()->createMany([
+            ['locale' => 'en', 'value' => 'Failed', 'active' => true],
+            ['locale' => 'it', 'value' => 'Fallito', 'active' => true],
+        ]);
+    $group = TranslationGroup::create(['prefix' => 'auth.messages', 'published' => true]);
+
+    $file = makeCsv([
+        ['key', 'en', 'it'],
+        ['auth.messages.hello', 'Hello', 'Ciao'],
+    ], ';');
+
+    $this->withoutMiddleware()
+        ->post(route('admin.translations.translationGroups.importCsv', $group->id), [
+            'csv_file' => $file,
+            'csv_delimiter' => ';',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('status');
+
+    expect(File::exists($this->tmpDir.'/en/auth.messages.php'))->toBeFalse()
+        ->and(require $this->tmpDir.'/en/auth.php')->toBe([
+            'failed' => 'Failed',
+            'messages' => ['hello' => 'Hello'],
+        ]);
+});
