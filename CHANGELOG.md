@@ -2,6 +2,33 @@
 
 All notable changes to `TwillTranslationHandler` will be documented in this file.
 
+## Unreleased
+
+### New
+
+- **Laravel 13 support.** `laravel/framework ^11.0|^12.0|^13.0`; Laravel 13 needs Twill 3.6+ and PHP 8.3+. The CI matrix adds Laravel 13 on PHP 8.3 / 8.4 (Testbench 11, Pest 4).
+- **`laravel-translation-handler` updated to `^2.8`.** Exports refuse a key that is both a value and a parent (`auth.a` + `auth.a.b`) instead of writing a broken file, and CSV exports neutralise spreadsheet formulas (`csvEscapeFormulas`, on by default): a value starting with `=`, `+`, `-` or `@` is written with a leading `'`, which the import strips again.
+
+### Bug fixes
+
+- **Nested groups are exported to the right lang file.** Saving a nested group (e.g. `auth.messages`) from the admin, or importing a CSV into it, wrote `lang/{locale}/auth.messages.php` and never updated `auth.php`, the file Laravel reads. The export now targets the group's first prefix segment. Delete any stray `lang/*/*.*.php` files the old behaviour left behind.
+- **Failed exports after an admin save are reported.** Saving a key swallowed export errors without logging them; saving a group returned a 500 after the values were already stored. Both now keep the values, report the exception through the exception handler and reset the handler options.
+- **The group editor offers only the exported locales.** It used Twill's `translatable.locales`, so a value saved for a locale missing from `translation-handler.locales` stayed in the database and never reached a lang file. The key editor still uses `translatable.locales`: keep the two lists identical.
+- **CSV delimiter validated.** An invalid `csv_delimiter` returned a 500 (`ValueError` from `fputcsv()`); it is now a validation error. All CSV actions reset the handler options in a `finally` block.
+- **`%` and `_` are matched literally** in group prefixes and in the admin search. A group `a_b` no longer lists the keys of `axb`.
+- **Complete published config.** `config/translation-handler.php` now contains every core option (`phpPint`, `csvEscapeFormulas`, `jsonFileName`, `jsonNested`, `jsonFormat`, `check`, `checkIncludeFrameworkKeys`, `checkerClass`) and `fileNames` defaults to `['messages']` instead of the `['test']` placeholder. Publish this config, not the core's: both use the same file name.
+
+### Performance
+
+- Groups are created with a single `insertOrIgnore` per import instead of a `firstOrCreate` per prefix, splitting keys with the runtime `keyDelimiter` option.
+- The groups listing loads `translations_count` with a subquery instead of a `COUNT` per row.
+
+### Housekeeping
+
+- Tests for the real migrations (empty database, after the core stubs, re-run, rollback).
+- Removed a stray SQLite schema dump (`translation_keys`) from the repository root; real package description in `composer.json`.
+- GitHub Actions: `actions/checkout` v7, `dependabot/fetch-metadata` v3.1.0.
+
 ## v2.3.0 — Ship Boost guidelines & skills - 2026-06-16
 
 - **Ship Laravel Boost guidelines and skills.** `php artisan boost:install` now discovers `twill-translation-handler` and offers to install an AI guideline plus the `translation-handler-mcp` and `translation-handler-development` skills. Boost only discovers the guidelines/skills of *direct* Composer dependencies, so the core `laravel-translation-handler` package — a transitive dependency in a Twill app — was previously skipped entirely; this package now re-exports its Boost resources. The content is read live from the installed core package at install time (a thin Blade wrapper around the core `core.blade.php` and `SKILL.md` files), so it stays in sync with the installed `laravel-translation-handler` version without duplication. A Twill-specific section covers editing translations from the admin.
