@@ -2,7 +2,9 @@
 
 All notable changes to `TwillTranslationHandler` will be documented in this file.
 
-## Unreleased
+## v2.4.0 — Core 2.8 alignment & Laravel 13 - 2026-10-21
+
+**Full changelog:** [v2.3.0...v2.4.0](https://github.com/BrunosCode/TwillTranslationHandler/compare/v2.3.0...v2.4.0)
 
 ### New
 
