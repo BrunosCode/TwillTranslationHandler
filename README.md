@@ -191,11 +191,11 @@ Once installed, a **Translations** section will appear in the Twill admin naviga
 
 ### Keys
 
-Lists all translation keys stored in the database. Each key can be opened to edit its translated value for every configured locale. Translation keys are managed exclusively through import — manual creation is intentionally disabled to keep the database in sync with source files.
+Lists all translation keys stored in the database. Each key can be opened to edit its translated value for every configured locale. Translation keys are managed exclusively through import — manual creation is intentionally disabled to keep the database in sync with source files. The search box matches both keys and values.
 
 ### Groups
 
-Lists all translation groups, auto-generated from the key prefixes. Every import or sync into the database creates the missing groups and deletes the ones no key belongs to any more. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form.
+Lists all translation groups, auto-generated from the key prefixes. Every import or sync into the database creates the missing groups and deletes the ones no key belongs to any more. Opening a group shows all matching keys in a repeater, allowing batch editing of every locale's value from a single form. The search box matches prefixes, keys and values.
 
 ### Import / Export
 
@@ -236,7 +236,7 @@ Opening a group shows the **prefix** (read-only) and one textarea per translatio
 
 Field naming: each textarea is internally keyed as `trans_<id>` where `<id>` is the `translation_keys.id`. This is transparent to editors but relevant if you extend the form.
 
-Saving a group writes all locale values and immediately exports the affected PHP language file.
+Saving a group writes all locale values, marks them active and immediately exports the affected PHP language file. The save is refused with a validation error, before anything is written, when it would leave the lang file with a key that is both a value and a parent (e.g. `auth.a` and `auth.a.b`), or when it carries a locale missing from `translation-handler.locales`.
 
 ### allow_empty
 
@@ -245,7 +245,7 @@ Both modules show an **Allow empty** checkbox in the sidebar. Its effect is on f
 | Module | `allow_empty` unchecked | `allow_empty` checked |
 |--------|------------------------|----------------------|
 | **Keys** | Value is `required` for every locale | Value is `nullable` — empty strings are accepted |
-| **Groups** | Every locale value of every key is `required` | No validation — any combination of values is accepted |
+| **Groups** | Every locale value of every key is `required` | Empty values are accepted (locale and key conflict checks still apply) |
 
 When a value reaches the repository as `null` (e.g. the editor cleared a field), it is normalised to an empty string before being persisted. This means the database never stores `null` in `translation_values.value` through a form save.
 

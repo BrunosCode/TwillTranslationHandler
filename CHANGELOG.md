@@ -14,20 +14,31 @@ All notable changes to `TwillTranslationHandler` will be documented in this file
 ### Bug fixes
 
 - **Nested groups are exported to the right lang file.** Saving a nested group (e.g. `auth.messages`) from the admin, or importing a CSV into it, wrote `lang/{locale}/auth.messages.php` and never updated `auth.php`, the file Laravel reads. The export now targets the group's first prefix segment. Delete any stray `lang/*/*.*.php` files the old behaviour left behind.
-- **Failed exports after an admin save are reported.** Saving a key swallowed export errors without logging them; saving a group returned a 500 after the values were already stored. Both now keep the values, report the exception through the exception handler and reset the handler options.
+- **Failed exports after an admin save are reported.** Saving a key swallowed export errors without logging them; it now reports the exception through the exception handler and resets the handler options.
+- **Group saves are validated before anything is written.** A value for a locale that is not exported, or a lang file holding a key both as a value and as a parent (`auth.a` + `auth.a.b`), is now a validation error in the form (the conflict message names both keys). It used to store the values and then fail with a 500.
+- **The listing search box searches values again.** Twill 3 no longer reads `$defaultFilters`, so the search only matched the key (or prefix) with an unescaped LIKE. Both listings now search keys, values and prefixes through the repositories.
 - **The group editor offers only the exported locales.** It used Twill's `translatable.locales`, so a value saved for a locale missing from `translation-handler.locales` stayed in the database and never reached a lang file. The key editor still uses `translatable.locales`: keep the two lists identical.
 - **CSV delimiter validated.** An invalid `csv_delimiter` returned a 500 (`ValueError` from `fputcsv()`); it is now a validation error. All CSV actions reset the handler options in a `finally` block.
+- **The "tab" CSV delimiter works.** Laravel's `TrimStrings` middleware stripped the literal tab the forms sent, so imports silently used `;`. The forms now send `tab`.
+- **Concurrent CSV imports and exports no longer collide.** Each request works on its own file in `csvPath`; downloads keep the configured `csvFileName`, and failed imports clean up their upload.
 - **`%` and `_` are matched literally** in group prefixes and in the admin search. A group `a_b` no longer lists the keys of `axb`.
 - **Complete published config.** `config/translation-handler.php` now contains every core option (`phpPint`, `csvEscapeFormulas`, `jsonFileName`, `jsonNested`, `jsonFormat`, `check`, `checkIncludeFrameworkKeys`, `checkerClass`) and `fileNames` defaults to `['messages']` instead of the `['test']` placeholder. Publish this config, not the core's: both use the same file name.
 
+### Changed
+
+- **Empty groups are deleted.** Every import or sync into the database now removes the groups no key belongs to any more (a hard delete: a group is only a container for a prefix).
+- **Admin controllers use the Twill 3 API** (`setUpController()`, Table Builder columns, `setSearchQuery()`) instead of the deprecated Twill 2 properties.
+
 ### Performance
 
+- Saving a group writes all its values with a single core `set()`: about 10 queries instead of two per value (155 for 30 keys in two locales).
 - Groups are created with a single `insertOrIgnore` per import instead of a `firstOrCreate` per prefix, splitting keys with the runtime `keyDelimiter` option.
 - The groups listing loads `translations_count` with a subquery instead of a `COUNT` per row.
 
 ### Housekeeping
 
 - Tests for the real migrations (empty database, after the core stubs, re-run, rollback).
+- The workbench (`composer build`) seeds again: it now applies this package's config, which core v2.7+ requires for the seeded keys.
 - Removed a stray SQLite schema dump (`translation_keys`) from the repository root; real package description in `composer.json`.
 - GitHub Actions: `actions/checkout` v7, `dependabot/fetch-metadata` v3.1.0.
 
