@@ -10,6 +10,10 @@ All notable changes to `TwillTranslationHandler` will be documented in this file
 
 - **`laravel-translation-handler` updated to `^2.8.1`.** The core migration stubs now skip tables that already exist, so publishing them after this package's migrations no longer makes `migrate` fail. The README no longer warns against publishing them.
 
+### Housekeeping
+
+- PHPStan runs on PHP 8.4 in CI, so it analyses the Laravel 13 stack. There Larastan could not see this package's views, because `testbench.yaml` did not register the package's service provider; it now does.
+
 ## v2.4.0 — Core 2.8 alignment & Laravel 13 - 2026-10-21
 
 **Full changelog:** [v2.3.0...v2.4.0](https://github.com/BrunosCode/TwillTranslationHandler/compare/v2.3.0...v2.4.0)
