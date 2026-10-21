@@ -116,3 +116,77 @@ it('loads the translations count of the listing without a query per group', func
         // Twill's status counters run count() on the same filtered query
         ->and($this->repository->filter(TranslationGroup::query(), ['search' => 'nav'])->count())->toBe(1);
 });
+
+// ---------------------------------------------------------------------------
+// update(): behaviour the save must preserve
+// ---------------------------------------------------------------------------
+
+function saveGroup(TranslationGroup $group, array $values): void
+{
+    $fields = ['prefix' => $group->prefix, 'published' => true];
+
+    foreach ($values as $translationId => $localeValues) {
+        $fields['trans_'.$translationId] = $localeValues;
+    }
+
+    app(TranslationGroupRepository::class)->update($group->id, $fields);
+}
+
+function storedValues(Translation $translation): array
+{
+    return $translation->translations()->orderBy('locale')->get(['locale', 'value', 'active'])
+        ->mapWithKeys(fn ($tv) => [$tv->locale => [$tv->value, (bool) $tv->active]])
+        ->all();
+}
+
+it('stores a null value as an empty string', function () {
+    $group = TranslationGroup::create(['prefix' => 'save']);
+    $t = Translation::create(['key' => 'save.key']);
+    $t->translations()->create(['locale' => 'en', 'value' => 'Old', 'active' => true]);
+
+    saveGroup($group, [$t->id => ['en' => null]]);
+
+    expect(storedValues($t))->toBe(['en' => ['', true]]);
+});
+
+it('reactivates an inactive value it saves', function () {
+    $group = TranslationGroup::create(['prefix' => 'save']);
+    $t = Translation::create(['key' => 'save.key']);
+    $t->translations()->create(['locale' => 'en', 'value' => 'Old', 'active' => false]);
+    $t->translations()->create(['locale' => 'it', 'value' => 'Vecchio', 'active' => false]);
+
+    saveGroup($group, [$t->id => ['en' => 'New']]);
+
+    expect(storedValues($t))->toBe(['en' => ['New', true], 'it' => ['Vecchio', false]]);
+});
+
+it('creates the value of a locale the key did not have yet', function () {
+    $group = TranslationGroup::create(['prefix' => 'save']);
+    $t = Translation::create(['key' => 'save.key']);
+    $t->translations()->create(['locale' => 'en', 'value' => 'Hello', 'active' => true]);
+
+    saveGroup($group, [$t->id => ['en' => 'Hello', 'it' => 'Ciao']]);
+
+    expect(storedValues($t))->toBe(['en' => ['Hello', true], 'it' => ['Ciao', true]]);
+});
+
+it('leaves the other keys of the file untouched', function () {
+    $group = TranslationGroup::create(['prefix' => 'save.nested']);
+    $sibling = Translation::create(['key' => 'save.sibling']);
+    $sibling->translations()->create(['locale' => 'en', 'value' => 'Sibling', 'active' => false]);
+    $t = Translation::create(['key' => 'save.nested.key']);
+    $t->translations()->create(['locale' => 'en', 'value' => 'Old', 'active' => true]);
+
+    saveGroup($group, [$t->id => ['en' => 'New']]);
+
+    expect(storedValues($t))->toBe(['en' => ['New', true]])
+        ->and(storedValues($sibling))->toBe(['en' => ['Sibling', false]]);
+});
+
+it('ignores fields of keys that do not exist', function () {
+    $group = TranslationGroup::create(['prefix' => 'save']);
+
+    saveGroup($group, [999 => ['en' => 'Ghost']]);
+
+    expect(Translation::count())->toBe(0);
+});
