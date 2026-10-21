@@ -24,7 +24,9 @@ class TranslationGroupController extends ModuleController
 
     protected function formData($request)
     {
-        $locales = config('translatable.locales', config('translation-handler.locales', ['en']));
+        // The locales the core exports to lang files: a value saved for any
+        // other locale would stay in the database and never reach a file.
+        $locales = config('translation-handler.locales', ['en']);
 
         return [
             'translate' => true,

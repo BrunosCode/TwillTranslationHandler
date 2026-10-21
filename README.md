@@ -171,6 +171,8 @@ return [
 
 See [LaravelTranslationHandler](https://github.com/BrunosCode/LaravelTranslationHandler) for the full list of configuration options.
 
+`locales` decides which locales are exported to the lang files, and the group edit page offers exactly those. The key edit page uses Twill's `translatable.locales` instead: keep the two lists identical, otherwise a value saved for a locale missing from `locales` stays in the database and never reaches a lang file.
+
 ## Usage
 
 Once installed, a **Translations** section will appear in the Twill admin navigation with three pages:
