@@ -77,6 +77,8 @@ Publish the config file:
 php artisan vendor:publish --tag="twill-translation-handler-config"
 ```
 
+Both this package and LaravelTranslationHandler publish `config/translation-handler.php`. Publish **this** one: it holds every core option plus the Twill defaults (`dbHandlerClass`, database as source of truth, `legacy-twill-navigation`). Do not also run the core's `translation-handler-config` tag, it would overwrite the file with the core defaults.
+
 Optionally publish the views to customise them:
 
 ```bash
@@ -153,22 +155,27 @@ return [
 // config/translation-handler.php
 
 return [
-    'keyDelimiter' => '.',          // Separator used in nested translation keys
+    'legacy-twill-navigation' => true,  // Register the menu via twill-navigation (see Navigation)
 
-    'fileNames' => ['messages'],    // PHP file names to sync (without .php extension)
-    'locales'   => ['en', 'it'],    // Supported locales
+    'keyDelimiter' => '.',              // Separator used in nested translation keys
 
-    // Default import/export direction
+    'fileNames' => ['messages'],        // Lang files managed from the admin (without .php)
+    'locales'   => ['en', 'it'],        // Locales exported to the lang files
+
+    // The database is the source of truth
     'defaultImportFrom' => TranslationOptions::PHP,
     'defaultImportTo'   => TranslationOptions::DB,
     'defaultExportFrom' => TranslationOptions::DB,
     'defaultExportTo'   => TranslationOptions::PHP,
 
-    'phpPath'      => lang_path(),          // Path to PHP language files
-    'csvDelimiter' => ';',                  // CSV column delimiter
-    'csvFileName'  => 'translations',       // Default CSV file name
-    'csvPath'      => storage_path('lang'), // Directory for CSV files
-    'jsonPath'     => lang_path(),          // Path to JSON language files
+    'dbHandlerClass' => DatabaseHandler::class, // Twill handler: also creates the groups
+
+    'phpPath'           => lang_path(),          // Path to PHP language files
+    'csvDelimiter'      => ';',                  // Default CSV column delimiter
+    'csvEscapeFormulas' => true,                 // Neutralise spreadsheet formulas in CSV exports
+    'csvFileName'       => 'translations',       // CSV file name used by import/export
+    'csvPath'           => storage_path('lang'), // Must be writable by the web server
+    // ... plus the JSON and `check` options of the core
 ];
 ```
 
