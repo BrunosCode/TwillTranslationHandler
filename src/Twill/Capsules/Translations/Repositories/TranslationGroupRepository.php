@@ -22,30 +22,26 @@ class TranslationGroupRepository extends ModuleRepository
 
     public function filter(Builder $query, array $scopes = []): Builder
     {
+        // Listing hook: every listing query passes through filter().
+        TranslationGroup::selectTranslationsCount($query);
+
         if (! empty($scopes['search'])) {
             $search = $scopes['search'];
-            $delimiter = config('translation-handler.keyDelimiter', '.');
-            $driver = DB::connection()->getDriverName();
+            [$keyInGroup, $bindings] = TranslationGroup::keyInGroupCondition();
 
-            $prefix = Like::escapeColumn('translation_groups.prefix');
-            $concatKeyExpr = $driver === 'sqlite'
-                ? "translation_keys.key LIKE ({$prefix} || ? || '%') ESCAPE '!'"
-                : "translation_keys.key LIKE CONCAT({$prefix}, ?, '%') ESCAPE '!'";
-            $delimiter = Like::escape($delimiter);
-
-            $query->where(function ($q) use ($search, $delimiter, $concatKeyExpr) {
+            $query->where(function ($q) use ($search, $keyInGroup, $bindings) {
                 Like::contains($q, 'prefix', $search)
-                    ->orWhereExists(function ($sub) use ($search, $delimiter, $concatKeyExpr) {
+                    ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
                         $sub->select(DB::raw(1))
                             ->from('translation_keys')
-                            ->whereRaw($concatKeyExpr, [$delimiter]);
+                            ->whereRaw($keyInGroup, $bindings);
                         Like::contains($sub, 'translation_keys.key', $search);
                     })
-                    ->orWhereExists(function ($sub) use ($search, $delimiter, $concatKeyExpr) {
+                    ->orWhereExists(function ($sub) use ($search, $keyInGroup, $bindings) {
                         $sub->select(DB::raw(1))
                             ->from('translation_values')
                             ->join('translation_keys', 'translation_keys.id', '=', 'translation_values.translation_key_id')
-                            ->whereRaw($concatKeyExpr, [$delimiter]);
+                            ->whereRaw($keyInGroup, $bindings);
                         Like::contains($sub, 'translation_values.value', $search);
                     });
             });

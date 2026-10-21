@@ -3,6 +3,7 @@
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\Translation;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Repositories\TranslationGroupRepository;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->repository = app(TranslationGroupRepository::class);
@@ -93,4 +94,25 @@ it('treats like wildcards in the search and in the group prefix literally', func
     expect($search('needle'))->toBe([])
         ->and($search('%'))->toBe(['plain'])
         ->and($search('_'))->toBe(['a_b']);
+});
+
+it('loads the translations count of the listing without a query per group', function () {
+    foreach (['menu', 'nav', 'footer'] as $prefix) {
+        TranslationGroup::create(['prefix' => $prefix]);
+        Translation::create(['key' => $prefix.'.one']);
+        Translation::create(['key' => $prefix.'.two']);
+    }
+    Translation::create(['key' => 'menu.three']);
+    Translation::create(['key' => 'menu.gone'])->delete();
+
+    DB::enableQueryLog();
+
+    $counts = $this->repository->get([], [], [], -1)
+        ->mapWithKeys(fn (TranslationGroup $group) => [$group->prefix => $group->translations_count])
+        ->all();
+
+    expect(DB::getQueryLog())->toHaveCount(1)
+        ->and($counts)->toEqual(['menu' => 3, 'nav' => 2, 'footer' => 2])
+        // Twill's status counters run count() on the same filtered query
+        ->and($this->repository->filter(TranslationGroup::query(), ['search' => 'nav'])->count())->toBe(1);
 });
