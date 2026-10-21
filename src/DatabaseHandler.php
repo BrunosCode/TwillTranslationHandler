@@ -4,6 +4,7 @@ namespace BrunosCode\TwillTranslationHandler;
 
 use BrunosCode\TranslationHandler\Collections\TranslationCollection;
 use BrunosCode\TranslationHandler\DatabaseHandler as BaseDatabaseHandler;
+use BrunosCode\TranslationHandler\Facades\TranslationHandler;
 use BrunosCode\TranslationHandler\Interfaces\DatabaseHandlerInterface;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
 use Illuminate\Database\Connection;
@@ -20,7 +21,9 @@ class DatabaseHandler extends BaseDatabaseHandler implements DatabaseHandlerInte
 
     protected function syncGroups(TranslationCollection $translations): void
     {
-        $delimiter = config('translation-handler.keyDelimiter', '.');
+        // The service builds this handler with its current options, so the
+        // facade returns the delimiter in use, including runtime overrides.
+        $delimiter = TranslationHandler::getOption('keyDelimiter');
         $prefixes = collect();
 
         $translations->pluck('key')->unique()->each(function (string $key) use ($prefixes, $delimiter) {
@@ -37,8 +40,21 @@ class DatabaseHandler extends BaseDatabaseHandler implements DatabaseHandlerInte
             }
         });
 
-        $prefixes->keys()->each(function (string $prefix) {
-            TranslationGroup::firstOrCreate(['prefix' => $prefix]);
-        });
+        if ($prefixes->isEmpty()) {
+            return;
+        }
+
+        $now = now();
+
+        // One statement for all prefixes: existing groups are skipped by the
+        // unique index on prefix.
+        TranslationGroup::query()->insertOrIgnore(
+            $prefixes->keys()->map(fn (string $prefix) => [
+                'prefix' => $prefix,
+                'published' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all()
+        );
     }
 }

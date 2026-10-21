@@ -3,8 +3,10 @@
 use BrunosCode\TranslationHandler\Collections\TranslationCollection;
 use BrunosCode\TranslationHandler\Data\Translation as TranslationData;
 use BrunosCode\TranslationHandler\Data\TranslationOptions;
+use BrunosCode\TranslationHandler\Facades\TranslationHandler;
 use BrunosCode\TwillTranslationHandler\DatabaseHandler;
 use BrunosCode\TwillTranslationHandler\Twill\Capsules\Translations\Models\TranslationGroup;
+use Illuminate\Support\Facades\DB;
 
 function makeHandler(): DatabaseHandler
 {
@@ -87,4 +89,29 @@ it('handles multiple files creating shared prefixes', function () {
 
     expect(TranslationGroup::where('prefix', 'app')->count())->toBe(1)
         ->and(TranslationGroup::where('prefix', 'app.footer')->exists())->toBeTrue();
+});
+
+it('splits group prefixes with the runtime key delimiter', function () {
+    TranslationHandler::setOption('keyDelimiter', '::');
+
+    makeHandler()->handleInsert(app('db')->connection(), makeCollection(['test::menu::home']), 'test');
+
+    TranslationHandler::resetOptions();
+
+    expect(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['test', 'test::menu']);
+});
+
+it('creates all missing groups with a single query', function () {
+    TranslationGroup::create(['prefix' => 'test']);
+
+    DB::enableQueryLog();
+
+    makeHandler()->handleInsert(app('db')->connection(), makeCollection(['test.a.b.c', 'test.x.y']), 'test');
+
+    $groupQueries = collect(DB::getQueryLog())->filter(fn (array $q) => str_contains($q['query'], 'translation_groups'));
+
+    expect($groupQueries)->toHaveCount(1)
+        ->and(TranslationGroup::orderBy('prefix')->pluck('prefix')->all())->toBe(['test', 'test.a', 'test.a.b', 'test.x'])
+        ->and(TranslationGroup::where('prefix', 'test.a')->first()->published)->toBeTruthy()
+        ->and(TranslationGroup::where('prefix', 'test.a')->first()->created_at)->not->toBeNull();
 });
